@@ -1,0 +1,272 @@
+<!DOCTYPE html>
+<head>
+  <link rel="stylesheet" href="/css/teams.css" type="text/css" media="screen" title="no title" charset="utf-8">
+  <link rel="stylesheet" href="/fancybox/jquery.fancybox-1.3.1.css" type="text/css" media="screen" title="no title" charset="utf-8">
+  
+  <script src="http://ajax.googleapis.com/ajax/libs/jquery/1.4.2/jquery.min.js" type="text/javascript"></script>
+  <script src="/js/js-model-0.9.3.min.js" type="text/javascript"></script>
+  <script src="/fancybox/jquery.fancybox-1.3.1.js" type="text/javascript"></script>
+  <script src="http://js.pusherapp.com/1.6/pusher.min.js" type="text/javascript"></script>
+  <script src="/js/flot/jquery.flot.min.js"></script>
+  <script type="text/javascript" charset="utf-8">
+    
+    Pusher.log = function() {
+      console.log(Array.prototype.slice.call(arguments, 0));
+    }
+    
+    function require (file) {
+      var script = $('<script>', {src: '/js/' + file + '.js'});
+      $('head').append(script);
+    }
+    
+    require('models/team');
+    require('models/collaborator');
+    require('models/commit');
+    require('views/teams');    
+    <% if App.development? %>
+    require('event_dispatcher');
+    require('pusher-mock');
+    require('mock_events');
+    <% end %>
+    require('jquery.highlight');
+    
+    var tweet_data, irc_data;
+    
+    function CommitHistory(data){
+      Commit.loadData(data)
+    }
+    
+    function TweetHistory(data){
+      tweet_data = data;
+    }
+    
+    function IRCHistory(data){
+      irc_data = data;
+    }
+    
+    function TeamLoad(data){
+      $.each(data.teams, function(){
+        var team = new Team({
+          name: this.name,
+          repo: this.repository,
+          id: this.id,
+          commit_counts: this.commit_counts
+        })
+        Team.add(team);
+        var collabs = []
+        for (var i=0; i < this.collaborators.length; i++) {
+          var c = this.collaborators[i]
+          var collaborator = new Collaborator({
+            github_name: c.github,
+            gravatar: c.gravatar,
+            twitter_name: c.twitter,
+            name: c.twitter,
+            irc_name: c.irc,
+            id: c.id
+          });
+          collaborator.attr('team', team);
+          Collaborator.add(collaborator);
+          collabs.push(collaborator);
+        };
+        team.attr('collaborators', collabs);
+      })
+    }
+   
+    var use_mock = <%= App.development? ? 'true' : 'false' %>;
+    var server;
+        
+    $(function(){
+      
+      Team.each(function() {
+        new TeamView(this, '#teams')
+      });
+      
+      Commit.each(function() {
+        new CommitView(this, '#commits')
+      });
+      
+      for (var i=irc_data.length-1; i > -1; i--) {
+        new IrcView(irc_data[i], '#irc');
+      };
+      for (var i=tweet_data.length - 1; i > -1; i--) {
+        new TweetView(tweet_data[i], '#tweets');
+      };
+      // Pusher
+      
+      if(use_mock) {
+        server = new PusherMock(400);
+      } else {
+        var socket = new Pusher('YOUR_API_KEY');
+        server = socket.subscribe('rumble');
+      }
+      
+      server.bind('commits:commit', function (commit) {
+        var model = new Commit(commit);
+        Commit.add(model);
+        try {
+          new CommitView(model, '#commits');
+          model.team().trigger('commit_new', [model]);
+        } catch(e) {
+          Pusher.log(e, model)
+        }
+        
+      });
+      
+      server.bind('twitter:tweet', function (tweet) {
+        var collab = Collaborator.find_by_twitter_name(tweet.user.screen_name);
+        if (collab)
+          collab.attr('team').trigger('tweet_new', [tweet]);
+        new TweetView(tweet, '#tweets');
+      });
+      
+      
+      server.bind('irc:message', function (irc) {
+        var collab = Collaborator.find_by_irc_name(irc.user);
+        if (collab)
+          collab.attr('team').trigger('irc_new', [irc]);
+        new IrcView(irc, '#irc');
+      })
+      
+      setInterval(function () {
+        Team.tick();
+      }, 50);
+      
+      $('.team').toolTip();
+    });
+  </script>
+  
+  <!-- get some JsonP -->
+  <script src="http://railsrumble.com/dash?callback=TeamLoad" type="text/javascript"></script>
+  <script src="http://dash.railsrumble.com/history/twitter:tweet?callback=TweetHistory" type="text/javascript"></script>
+  <script src="http://dash.railsrumble.com/history/irc:message?callback=IRCHistory" type="text/javascript"></script>
+  <script src="http://dash.railsrumble.com/history/commits:commit?callback=CommitHistory" type="text/javascript"></script>
+  <title>Rumble dash</title>
+</head>
+
+<body>
+  <div id="header" class="clearfix">
+		<div id="pusher_logo">
+			<a href="http://pusherapp.com">Powered by <br>
+				<img src="/images/pusher_logo.png">
+			</a>
+		</div>
+    <a href="http://railsrumble.com" id="logo">
+      <img src="/images/rumble_logo.png" alt="Rails rumble" />
+    </a>
+  </div>
+  <div id="wrapper">
+    <div id="primary"> 
+           
+      <div id="teams_wrapper" class="box">        
+        <div id="teams" class="clearfix">
+      
+        </div><!-- /teams -->
+      </div>
+      
+    </div>
+    
+    <div id="secondary">
+      
+      <div class="section tweets">
+        <h1>Twitter</h1>        
+        <ul id="tweets" class="message_list">
+
+        </ul>
+      </div>
+      
+      <div class="section irc">        
+        <h1>IRC</h1>
+        <div class="box">
+          <ul id="irc" class="message_list">
+        
+          </ul>          
+        </div>
+        
+      </div>
+      
+      <div class="section commits">
+        <h1>Commits</h1>
+        <ul id="commits" class="box">
+
+        </ul><!-- /commits -->
+      </div>
+      
+    </div>
+    
+  </div>
+  
+  <div id="templates" style="display:none">
+    
+    <div id="team_template" class="team">
+      <div class="outline">
+        <ul class="collaborators clearfix">
+        
+        </ul>        
+      </div>
+      <div class="popup">
+        <span class="user">user</span>
+        <span class="text">text</span>
+        <img src="/images/balloon.png" class="balloon" />
+      </div>
+    </div>
+    
+    <ul>      
+      <li id="collaborator_template" class="collaborator">
+        <img src="" class="gravatar" />
+      </li>
+      
+      <li id="team_fancybox_collaborator_template" class="collaborator clearfix">              
+        <img src="" class="gravatar" />
+        <p class="name"><strong></strong></p>
+        <p class="irc_name"><strong>irc</strong>:<span></span></p>
+        <p class="twitter_name"><strong>twitter name</strong>:<span></span></p>
+      </li>
+      
+      <li id="commit_template" class="commit">
+        <a class="team_name" href=""></a>
+        <strong class="commiter">[name]</strong>
+        <span class="message"></span>
+        <!--a class="link" href=""></a-->
+      </li>
+      
+      <li id="team_fancybox_commit_template" class="commit">
+        <span class="team_name"></span>
+        <strong class="commiter">[name]</strong>
+        <span class="message"></span>
+        <!--a class="link" href=""></a-->
+      </li>
+      
+      <li id="irc_template">
+        <strong class="user">user</strong>:
+        <span class="message"></span>
+      </li>
+      
+      <li id="tweet_template">
+        <strong class="user">user</strong>
+        <span class="message"></span>
+      </li>
+    </ul>
+    
+    <div id="team_fancybox_template">
+      <h1 class="name">name</h1>
+      <div class="clearfix">
+        <div class="section">
+          <h2>Collaborators</h2>
+          <ul class="collaborators">
+        
+          </ul>
+        </div>
+        <div class="section commits_column">
+          <h2>Commits per hour</h2>
+          <div class="graph"></div>
+          <ul class="commits">
+        
+          </ul>
+        </div>
+      </div>
+    </div>
+    
+    
+    
+  </div>
+</body>

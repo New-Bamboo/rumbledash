@@ -1,0 +1,82 @@
+jsonP({
+  
+  'commits': [
+    {
+      "repository": "http://github.com/some/repo1",
+      "author":"some-author-name",
+      "committed":"The committed timestamp",
+      "message":"The commit message",
+      "commitHash":"SHA of the commit"
+    },
+    {
+      "repository": "http://github.com/some/repo2",
+      "author":"some-author-name",
+      "committed":"The committed timestamp",
+      "message":"The commit message",
+      "commitHash":"SHA of the commit"
+    },
+    {
+      "repository": "http://github.com/some/repo1",
+      "author":"some-author-name",
+      "committed":"The committed timestamp",
+      "message":"The commit message",
+      "commitHash":"SHA of the commit"
+    }
+
+  ],
+  
+  'teams': [
+    <% 1.upto(300) do |i| %>
+      {
+        id: <%= i %>,
+        name: 'team <%= i %>',
+        repo: 'http://github.com/some/repo<%= i %>',
+        collaborator_ids: [<%= 1.upto(rand(4) + 1).map{|i| i}.join(', ') %>]
+      },
+      
+    <% end %>
+  ],
+  
+  'collaborators': [
+    {
+      id: 1, 
+      name: 'Foo Bar',
+      twitter_name: 'ismasan',
+      irc_name: 'fooirc',
+      github_name: 'foogh',
+      gravatar: "<%= gravatar('ismaelct@gmail.com') %>"
+    },
+    {
+      id: 2, 
+      name: 'Foo Bar 2',
+      twitter_name: 'maxthelion',
+      irc_name: 'fooirc',
+      github_name: 'foogh',
+      gravatar: '<%= gravatar('max@new-bamboo.co.uk') %>'
+    },
+    {
+      id: 3, 
+      name: 'Foo Bar 3',
+      twitter_name: 'dctanner',
+      irc_name: 'fooirc',
+      github_name: 'foogh',
+      gravatar: '<%= gravatar('max@new-bamboo.co.uk') %>'
+    },
+    {
+      id: 4, 
+      name: 'Foo Bar 4',
+      twitter_name: 'mlougrhan',
+      irc_name: 'fooirc',
+      github_name: 'foogh',
+      gravatar: '<%= gravatar('damien@new-bamboo.co.uk') %>'
+    },
+    {
+      id: 5, 
+      name: 'Foo Bar 5',
+      twitter_name: 'olivern',
+      irc_name: 'ircuser3',
+      github_name: 'foogh',
+      gravatar: '<%= gravatar('olivern@new-bamboo.co.uk') %>'
+    }
+  ]
+})
